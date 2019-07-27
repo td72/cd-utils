@@ -17,6 +17,10 @@ func list_history(c *cli.Context) error {
 	info := NewInfo()
 	var hs []History
 	info.DB.Find(&hs)
+	err := info.DB.Order("updated_at desc").Find(&hs).Error
+	if err != nil {
+		panic(err)
+	}
 	for _, h := range hs {
 		if c.Bool("abs") {
 			fmt.Println(h.Abs())
@@ -48,7 +52,7 @@ func choice_history(_ *cli.Context) error {
 		panic(err)
 	}
 	items := finder.NewItems()
-	for _, h := range hs {
+	for _, h := range hs[1:] {
 		items.Add(h.Tilda(), h)
 	}
 	fzf, err := finder.New("fzf", "--reverse", "--height", "40")
@@ -88,6 +92,19 @@ func add_history(c *cli.Context) error {
 	return nil
 }
 
+func latest_history(_ *cli.Context) error {
+	info := NewInfo()
+	var hs []History
+	err := info.DB.Order("updated_at desc").Find(&hs).Error
+	if err != nil {
+		panic(err)
+	}
+	if len(hs) > 1 {
+		fmt.Println(hs[1].Abs())
+	}
+	return nil
+}
+
 func init() {
 	command := cli.Command{
 		Name:    "history",
@@ -118,6 +135,11 @@ func init() {
 				Name: "choice",
 				Usage: "choice old path",
 				Action: choice_history,
+			},
+			{
+				Name: "latest",
+				Usage: "latest path",
+				Action: latest_history,
 			},
 		},
 	}
