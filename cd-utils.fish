@@ -3,6 +3,8 @@
 function cd
     if count $argv > /dev/null
         switch $argv
+            case -b
+                set path (cd-utils history latest)
             case -h
                 set path (cd-utils history choice)
             case '*'
