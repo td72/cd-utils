@@ -2,9 +2,10 @@ package main
 
 import (
 	"os"
-	"strings"
-	"reflect"
 	"path/filepath"
+	"reflect"
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -27,7 +28,7 @@ type PathInterface interface {
 
 type Path struct {
 	gorm.Model
-	Path string
+	Path   string
 	IsHome bool
 }
 
@@ -53,7 +54,7 @@ func (p Path) GetIsHome() bool {
 	return p.IsHome
 }
 
-func convert_to_tilda_path(path string) (string, bool){
+func convert_to_tilda_path(path string) (string, bool) {
 	if strings.HasPrefix(path, HOME_DIR) {
 		p, err := filepath.Rel(HOME_DIR, path)
 		if err != nil {
@@ -84,6 +85,16 @@ func NewBookmark(path string) *Bookmark {
 	return &Bookmark{p}
 }
 
+type WindowPath struct {
+	WindowId string
+	*Path
+}
+
+func NewWindowPath(windowId, path string) *WindowPath {
+	new_path, is_home := convert_to_tilda_path(path)
+	p := &Path{Path: new_path, IsHome: is_home}
+	return &WindowPath{windowId, p}
+}
 
 func get_cache_path() string {
 	cache_path, ok := os.LookupEnv(CACHE_ENV_NAME)
@@ -109,15 +120,15 @@ func NewInfo() *Info {
 	}
 	db.AutoMigrate(&History{})
 	db.AutoMigrate(&Bookmark{})
+	db.AutoMigrate(&WindowPath{})
 	return &Info{DB: db}
 }
 
 func (i *Info) NotExist(path PathInterface) bool {
-	var p  = reflect.ValueOf(&path).Elem().Interface()
+	var p = reflect.ValueOf(&path).Elem().Interface()
 	return i.DB.Where(
 		"path = ? AND is_home = ?",
 		path.GetPath(),
 		path.GetIsHome(),
 	).First(p).RecordNotFound()
 }
-
