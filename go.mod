@@ -8,5 +8,6 @@ require (
 	github.com/ktr0731/go-fuzzyfinder v0.1.2 // indirect
 	github.com/mattn/go-sqlite3 v1.11.0
 	github.com/urfave/cli v1.20.0
+	golang.org/x/tools v0.1.7 // indirect
 	golang.org/x/tools/gopls v0.1.3 // indirect
 )
