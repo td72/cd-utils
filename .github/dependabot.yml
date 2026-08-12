@@ -1,0 +1,20 @@
+version: 2
+
+# 注意: Go 本体 (ツールチェーン) のバージョンは mise (mise.toml / mise.lock) が管理しており、
+# Dependabot の対象外。Go 自体を上げるときは `mise upgrade go` などで mise.lock を更新すること。
+updates:
+  # Go モジュールの依存関係
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+
+  # GitHub Actions のバージョン更新。まとめて 1 PR にする。
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"

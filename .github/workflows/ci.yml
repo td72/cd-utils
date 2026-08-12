@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+# 同一 ref で新しい実行が始まったら、進行中の古い実行はキャンセルする
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Go は actions/setup-go ではなく mise で入れる。
+      # mise.lock で Go のバージョンが固定されているため、ローカルと CI で完全に同じになる。
+      # mise-action は mise 本体と mise がインストールするツール (= Go 本体) をキャッシュする。
+      - name: Set up mise
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+
+      # mise-action のキャッシュは「Go ツールチェーン本体」まで。
+      # ビルドキャッシュ / モジュールキャッシュは別途 actions/cache で面倒を見る必要がある。
+      - name: Cache Go build & module cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      # `mise run ci` 1発ではなく、どのチェックで落ちたか一目で分かるようにステップを分ける
+      - name: gofmt check
+        run: mise run fmt:check
+
+      - name: go vet
+        run: mise run vet
+
+      - name: go mod tidy check
+        run: mise run tidy
+
+      - name: Build
+        run: mise run build
+
+      - name: Test
+        run: mise run test
+
+      - name: Test with race detector
+        run: mise exec -- go test -race ./...
