@@ -1,20 +1,17 @@
 package main
-import (
-	"os"
-	"github.com/urfave/cli"
-)
 
+import (
+	"github.com/urfave/cli"
+	"os"
+)
 
 var (
 	App = cli.NewApp()
 )
 
-
-
 func initialize(_ *cli.Context) error {
 	return nil
 }
-
 
 func main() {
 	App.Name = "cd-utils"
