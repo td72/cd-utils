@@ -2,62 +2,84 @@ package main
 
 import (
 	"fmt"
-	"github.com/b4b4r07/go-finder"
-	"github.com/urfave/cli"
 	"os"
 	"path/filepath"
+
+	"github.com/b4b4r07/go-finder"
+	"github.com/urfave/cli"
 )
 
-func exist_path(path string) bool {
-	fileInfo, err := os.Stat(path)
-	return !os.IsNotExist(err) && fileInfo.IsDir()
+// isDir は path が存在するディレクトリかどうかを返す。
+//
+// 従来の exist_path は os.Stat が NotExist 以外のエラー (権限不足など) を
+// 返したときに nil の FileInfo を参照して panic していた。
+func isDir(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.IsDir()
 }
 
 func list_history(c *cli.Context) error {
-	info := NewInfo()
-	var hs []History
-	info.DB.Find(&hs)
-	err := info.DB.Order("updated_at desc").Find(&hs).Error
+	store, err := openStore()
 	if err != nil {
-		panic(err)
+		return err
+	}
+	defer store.Close()
+
+	hs, err := store.Histories()
+	if err != nil {
+		return err
 	}
 	for _, h := range hs {
 		if c.Bool("abs") {
 			fmt.Println(h.Abs())
 		} else {
-			fmt.Println(h.Tilda())
+			fmt.Println(h.Tilde())
 		}
 	}
 	return nil
 }
 
 func update_history(_ *cli.Context) error {
-	info := NewInfo()
-	var hs []History
-	info.DB.Find(&hs)
-	for _, h := range hs {
-		if !exist_path(h.Abs()) {
-			info.DB.Delete(&h)
-			fmt.Printf("remove: %s", h.Tilda())
+	store, err := openStore()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+
+	hs, err := store.Histories()
+	if err != nil {
+		return err
+	}
+	for i := range hs {
+		if isDir(hs[i].Abs()) {
+			continue
 		}
+		if err := store.DeleteHistory(&hs[i]); err != nil {
+			return err
+		}
+		fmt.Printf("remove: %s", hs[i].Tilde())
 	}
 	return nil
 }
 
 func choice_history(_ *cli.Context) error {
-	info := NewInfo()
-	var hs []History
-	err := info.DB.Order("updated_at desc").Find(&hs).Error
+	store, err := openStore()
 	if err != nil {
-		panic(err)
+		return err
+	}
+	defer store.Close()
+
+	hs, err := store.Histories()
+	if err != nil {
+		return err
 	}
 	items := finder.NewItems()
 	for _, h := range hs[1:] {
-		items.Add(h.Tilda(), h)
+		items.Add(h.Tilde(), h)
 	}
 	fzf, err := finder.New("fzf", "--reverse", "--height", "40")
 	if err != nil {
-		panic(err)
+		return err
 	}
 	selected, err := fzf.Select(items)
 	if err != nil {
@@ -76,28 +98,31 @@ func add_history(c *cli.Context) error {
 	}
 	path, err := filepath.Abs(c.Args().Get(0))
 	if err != nil {
-		panic(err)
+		return err
 	}
-	if !exist_path(path) {
+	if !isDir(path) {
 		return fmt.Errorf("%s is not directory or does not exist", path)
 	}
 
-	info := NewInfo()
-	h := NewHistory(path)
-	if info.NotExist(h) {
-		info.DB.Create(h)
-	} else {
-		info.DB.Save(h)
+	store, err := openStore()
+	if err != nil {
+		return err
 	}
-	return nil
+	defer store.Close()
+
+	return store.AddHistory(path)
 }
 
 func latest_history(_ *cli.Context) error {
-	info := NewInfo()
-	var hs []History
-	err := info.DB.Order("updated_at desc").Find(&hs).Error
+	store, err := openStore()
 	if err != nil {
-		panic(err)
+		return err
+	}
+	defer store.Close()
+
+	hs, err := store.Histories()
+	if err != nil {
+		return err
 	}
 	if len(hs) > 1 {
 		fmt.Println(hs[1].Abs())
