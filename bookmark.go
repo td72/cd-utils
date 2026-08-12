@@ -2,14 +2,55 @@ package main
 
 import (
 	"bufio"
+	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v3"
 )
 
-func list_bookmark(c *cli.Context) error {
+func bookmarkCommand() *cli.Command {
+	return &cli.Command{
+		Name:  "bookmark",
+		Usage: "cd bookmark utils",
+		Commands: []*cli.Command{
+			{
+				Name:   "list",
+				Usage:  "list all bookmarks",
+				Action: listBookmark,
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "abs",
+						Aliases: []string{"a"},
+						Usage:   "print absolute path. (default uses tilde)",
+					},
+				},
+			},
+			{
+				Name:      "add",
+				Usage:     "add new bookmark",
+				ArgsUsage: "<path>",
+				Action:    addBookmark,
+			},
+			{
+				Name:   "choice",
+				Usage:  "choice bookmark",
+				Action: choiceBookmark,
+			},
+			{
+				Name:   "delete",
+				Usage:  "delete bookmark",
+				Action: deleteBookmark,
+			},
+		},
+	}
+}
+
+func listBookmark(_ context.Context, cmd *cli.Command) error {
 	store, err := openStore()
 	if err != nil {
 		return err
@@ -21,11 +62,14 @@ func list_bookmark(c *cli.Context) error {
 		return err
 	}
 	if len(bs) == 0 {
-		fmt.Println("No Bookmark")
+		// 従来は stdout に "No Bookmark" を出し、fish 側が文字列比較していた。
+		// stdout はパスだけを流す約束にしたので stderr へ。
+		fmt.Fprintln(os.Stderr, "No bookmark")
 		return nil
 	}
+	abs := cmd.Bool("abs")
 	for _, b := range bs {
-		if c.Bool("abs") {
+		if abs {
 			fmt.Println(b.Abs())
 		} else {
 			fmt.Println(b.Tilde())
@@ -34,14 +78,17 @@ func list_bookmark(c *cli.Context) error {
 	return nil
 }
 
-func _choice_bookmark(store *Store) (bookmark Bookmark, err error) {
+// chooseBookmark は fzf でブックマークを選ばせる。
+// キャンセルされた場合は (nil, nil) を返す。
+func chooseBookmark(store *Store) (*Bookmark, error) {
 	bs, err := store.Bookmarks()
 	if err != nil {
-		return bookmark, err
+		return nil, err
 	}
 	if len(bs) == 0 {
-		return bookmark, fmt.Errorf("No Bookmark")
+		return nil, errors.New("no bookmark")
 	}
+
 	labels := make([]string, len(bs))
 	for i, b := range bs {
 		labels[i] = b.Tilde()
@@ -49,62 +96,73 @@ func _choice_bookmark(store *Store) (bookmark Bookmark, err error) {
 
 	idx, err := selectWithFzf(labels)
 	if err != nil {
-		return bookmark, err
+		return nil, err
 	}
 	if idx < 0 {
-		return bookmark, fmt.Errorf("")
+		return nil, nil
 	}
-	return bs[idx], nil
+	return &bs[idx], nil
 }
 
-func choice_bookmark(_ *cli.Context) error {
+func choiceBookmark(_ context.Context, _ *cli.Command) error {
 	store, err := openStore()
 	if err != nil {
 		return err
 	}
 	defer store.Close()
 
-	p, err := _choice_bookmark(store)
+	b, err := chooseBookmark(store)
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
-	fmt.Println(p.Abs())
+	if b == nil {
+		return nil
+	}
+	fmt.Println(b.Abs())
 	return nil
 }
 
-func delete_bookmark(_ *cli.Context) error {
+func deleteBookmark(_ context.Context, _ *cli.Command) error {
 	store, err := openStore()
 	if err != nil {
 		return err
 	}
 	defer store.Close()
 
-	b, err := _choice_bookmark(store)
+	b, err := chooseBookmark(store)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s\nregistar? [y/N]", b.Tilde())
-	stdin := bufio.NewScanner(os.Stdin)
-	for stdin.Scan() {
-		text := stdin.Text()
-		if len(text) > 0 {
-			return store.DeleteBookmark(&b)
-		}
+	if b == nil {
+		return nil
 	}
+
+	fmt.Fprintf(os.Stderr, "%s\ndelete? [y/N]: ", b.Tilde())
+	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return err
+	}
+
+	// 従来は空行以外すべてを「削除する」と解釈しており、[y/N] のプロンプトに
+	// 反して "n" と答えても削除されていた。
+	switch strings.ToLower(strings.TrimSpace(line)) {
+	case "y", "yes":
+		return store.DeleteBookmark(b)
+	}
+	fmt.Fprintln(os.Stderr, "canceled")
 	return nil
 }
 
-func add_bookmark(c *cli.Context) error {
-	if c.NArg() == 0 {
-		return fmt.Errorf(`"bookmark add" must need "path" argument`)
+func addBookmark(_ context.Context, cmd *cli.Command) error {
+	if cmd.NArg() == 0 {
+		return errors.New(`"bookmark add" requires a <path> argument`)
 	}
-	path, err := filepath.Abs(c.Args().Get(0))
+	path, err := filepath.Abs(cmd.Args().Get(0))
 	if err != nil {
 		return err
 	}
 	if !isDir(path) {
-		return fmt.Errorf("%s is not directory or does not exist", path)
+		return fmt.Errorf("%s is not a directory or does not exist", path)
 	}
 
 	store, err := openStore()
@@ -119,43 +177,7 @@ func add_bookmark(c *cli.Context) error {
 	}
 	if !created {
 		p, isHome := toTildePath(path)
-		fmt.Printf("%s is already registered", Path{Path: p, IsHome: isHome}.Tilde())
+		fmt.Fprintf(os.Stderr, "%s is already registered\n", Path{Path: p, IsHome: isHome}.Tilde())
 	}
 	return nil
-}
-
-func init() {
-	command := cli.Command{
-		Name:  "bookmark",
-		Usage: "cd bookmark utils",
-		Subcommands: []cli.Command{
-			{
-				Name:   "list",
-				Usage:  "list all bookmarks",
-				Action: list_bookmark,
-				Flags: []cli.Flag{
-					cli.BoolFlag{
-						Name:  "abs, a",
-						Usage: "print absolute path. (default uses tilda)",
-					},
-				},
-			},
-			{
-				Name:   "add",
-				Usage:  "add new bookmark",
-				Action: add_bookmark,
-			},
-			{
-				Name:   "choice",
-				Usage:  "choice bookmark",
-				Action: choice_bookmark,
-			},
-			{
-				Name:   "delete",
-				Usage:  "delete bookmark",
-				Action: delete_bookmark,
-			},
-		},
-	}
-	App.Commands = append(App.Commands, command)
 }

@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	github.com/glebarez/sqlite v1.11.1-0.20260802112547-caa6e2bf4e27
-	github.com/urfave/cli v1.20.0
+	github.com/urfave/cli/v3 v3.10.1
 	gorm.io/gorm v1.31.2
 )
 
