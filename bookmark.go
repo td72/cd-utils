@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/b4b4r07/go-finder"
 	"github.com/urfave/cli"
 )
 
@@ -43,22 +42,19 @@ func _choice_bookmark(store *Store) (bookmark Bookmark, err error) {
 	if len(bs) == 0 {
 		return bookmark, fmt.Errorf("No Bookmark")
 	}
-	items := finder.NewItems()
-	for _, b := range bs {
-		items.Add(b.Tilde(), b)
+	labels := make([]string, len(bs))
+	for i, b := range bs {
+		labels[i] = b.Tilde()
 	}
-	fzf, err := finder.New("fzf", "--reverse", "--height", "40")
+
+	idx, err := selectWithFzf(labels)
 	if err != nil {
 		return bookmark, err
 	}
-	selected, err := fzf.Select(items)
-	if err != nil {
-		return bookmark, err
-	}
-	if len(selected) == 0 {
+	if idx < 0 {
 		return bookmark, fmt.Errorf("")
 	}
-	return selected[0].(Bookmark), nil
+	return bs[idx], nil
 }
 
 func choice_bookmark(_ *cli.Context) error {
