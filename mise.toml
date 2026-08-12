@@ -39,3 +39,49 @@ run = "go mod tidy -diff"
 [tasks.ci]
 description = "Run the full CI suite locally"
 depends = ["fmt:check", "vet", "tidy", "build", "test"]
+
+[tasks.deploy]
+description = "Build and install cd-utils (binary + fish 設定)"
+depends = ["ci"]
+run = '''
+set -eu
+
+bin_dir="${CD_UTILS_BIN_DIR:-$HOME/bin}"
+fish_conf_dir="${CD_UTILS_FISH_CONF_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d}"
+
+# cd-utils.fish は cd / cb / fish_postexec フックをまとめて定義する。
+# 旧構成のファイルが残っていると二重定義になり、どちらが効くか分からなくなる。
+stale=0
+for f in \
+  "$HOME/.config/fish/functions/cd.fish" \
+  "$HOME/.config/fish/functions/cb.fish" \
+  "$HOME/.config/fish/conf.d/cd_utils_postexec.fish"
+do
+  if [ -e "$f" ]; then
+    if [ "$stale" -eq 0 ]; then
+      echo "deploy: 旧構成のファイルが残っています。削除してから再実行してください:" >&2
+      stale=1
+    fi
+    echo "  $f" >&2
+  fi
+done
+if [ "$stale" -eq 1 ]; then
+  exit 1
+fi
+
+mkdir -p "$bin_dir" "$fish_conf_dir"
+
+# 稼働中のバイナリを直接上書きすると ETXTBSY になりうる。
+# 別名で置いてから rename する (rename は原子的で、実行中でも安全)。
+go build -o "$bin_dir/.cd-utils.new" .
+mv "$bin_dir/.cd-utils.new" "$bin_dir/cd-utils"
+echo "deploy: $bin_dir/cd-utils"
+
+# fish 側も同様。読み込み途中の中途半端なファイルを見せない。
+cp cd-utils.fish "$fish_conf_dir/.cd-utils.fish.new"
+mv "$fish_conf_dir/.cd-utils.fish.new" "$fish_conf_dir/cd-utils.fish"
+echo "deploy: $fish_conf_dir/cd-utils.fish"
+
+echo
+echo "すでに開いている fish には古い定義が残っています。exec fish で読み直してください。"
+'''
