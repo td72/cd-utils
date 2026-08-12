@@ -35,46 +35,41 @@ $ git clone git@github.com:td72/cd-utils.git
 $ cd cd-utils
 $ mise trust          # このリポジトリの mise.toml を信頼する
 $ mise install        # mise.toml / mise.lock に従って Go を入れる
-$ mise run build      # go build ./... （カレントに cd-utils バイナリができる）
+$ mise run deploy     # ビルドして配置する
 ```
 
-`PATH` の通った場所に置きたい場合は `go install` を使います。
+`mise run deploy` は次の 2 つを行います。実行前に `mise run ci` が走るので、
+テストが落ちている状態では配置されません。
 
-```console
-$ mise exec -- go install .
-```
+| 配置先 | 既定値 | 上書きする環境変数 |
+| --- | --- | --- |
+| バイナリ | `~/bin/cd-utils` | `$CD_UTILS_BIN_DIR` |
+| fish 設定 | `~/.config/fish/conf.d/cd-utils.fish` | `$CD_UTILS_FISH_CONF_DIR` |
 
-`$GOBIN`（未設定なら `$GOPATH/bin`、既定では `~/go/bin`）に `cd-utils` が入るので、
-そこに `PATH` を通しておいてください。`cd-utils.fish` は `cd-utils` が `PATH` 上に
-あることを前提にしています。
+どちらも一時ファイルに書いてから `mv` で置き換えます。`mv` は原子的なので、
+稼働中のバイナリを差し替えても、読み込み途中の fish に中途半端なファイルを
+見せてしまうこともありません。
 
-## fish へのセットアップ
+配置後は新しい fish を起動するか `exec fish` で反映します。
 
-`cd-utils.fish` を `conf.d` に置くと、fish 起動時に自動で読み込まれます。
+`~/bin` に `PATH` が通っている必要があります（`cd-utils.fish` は
+`cd-utils` が `PATH` 上にあることを前提にしています）。
 
-```console
-$ ln -s (pwd)/cd-utils.fish ~/.config/fish/conf.d/cd-utils.fish
-```
-
-`config.fish` から明示的に読み込んでも構いません。
-
-```fish
-source /path/to/cd-utils/cd-utils.fish
-```
-
-読み込んだら、新しい fish を起動するか `exec fish` で反映します。
-
-> **注意: 既存の定義を先に削除すること**
+> **注意: 旧構成のファイルが残っていると deploy は失敗します**
 >
 > `cd-utils.fish` は `cd` / `cb` / `fish_postexec` フックをまとめて定義します。
 > 同名の定義が `~/.config/fish` に残っていると二重定義になり、どちらが効くか
-> 分からなくなります。次のファイルがあれば先に削除してください。
+> 分からなくなります。次のファイルがあれば削除してから再実行してください。
 >
 > - `~/.config/fish/functions/cd.fish`
 > - `~/.config/fish/functions/cb.fish`
 > - `~/.config/fish/conf.d/cd_utils_postexec.fish`
 >
-> これらは `cd-utils.fish` に取り込み済みです。
+> これらの内容は `cd-utils.fish` に取り込み済みです。
+
+シンボリックリンクではなくコピーを配置します。リポジトリを移動・削除しても
+壊れませんが、`cd-utils.fish` を編集したら `mise run deploy` をやり直して
+ください。
 
 ## 使い方
 
@@ -169,6 +164,7 @@ set -gx CD_HISTORY_CACHE_PATH ~/.local/share/cd-utils/cd-history.db
 | `mise run fmt:check` | 未フォーマットのファイルがあれば失敗 |
 | `mise run tidy` | `go mod tidy -diff`（go.mod / go.sum が untidy なら失敗） |
 | `mise run ci` | 上記のうち `fmt:check` / `vet` / `tidy` / `build` / `test` をまとめて実行 |
+| `mise run deploy` | `ci` を通してから、バイナリと fish 設定を配置する（[インストール](#インストール)を参照） |
 
 SQLite ドライバは純 Go 実装を使うため cgo は不要で、`mise.toml` の `[env]` で
 `CGO_ENABLED = "0"` を設定しています。
