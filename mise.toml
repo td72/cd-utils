@@ -1,0 +1,37 @@
+[tools]
+go = "latest"
+
+[tasks.build]
+description = "Build cd-utils"
+run = "go build ./..."
+
+[tasks.test]
+description = "Run tests"
+run = "go test ./..."
+
+[tasks.vet]
+description = "Run go vet"
+run = "go vet ./..."
+
+[tasks.fmt]
+description = "Format all Go files"
+run = "gofmt -w ."
+
+[tasks."fmt:check"]
+description = "Fail if any Go file is unformatted"
+run = '''
+unformatted=$(gofmt -l .)
+if [ -n "$unformatted" ]; then
+  echo "gofmt needs to be run on:" >&2
+  echo "$unformatted" >&2
+  exit 1
+fi
+'''
+
+[tasks.tidy]
+description = "Fail if go.mod/go.sum are untidy"
+run = "go mod tidy -diff"
+
+[tasks.ci]
+description = "Run the full CI suite locally"
+depends = ["fmt:check", "vet", "tidy", "build", "test"]
