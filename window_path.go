@@ -1,70 +1,86 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"path/filepath"
 
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v3"
 )
 
-func update_window_path(c *cli.Context) error {
-	store, err := openStore()
-	if err != nil {
-		return err
-	}
-	defer store.Close()
-
-	return store.SaveWindowPath(c.String("window_id"), c.String("path"))
-}
-
-func latest_window_path(c *cli.Context) error {
-	store, err := openStore()
-	if err != nil {
-		return err
-	}
-	defer store.Close()
-
-	wp, err := store.WindowPath(c.String("window_id"))
-	if err != nil {
-		return err
-	}
-	if wp == nil {
-		return fmt.Errorf("no path for window %s", c.String("window_id"))
-	}
-	fmt.Println(wp.Abs())
-	return nil
-}
-
-func init() {
-	command := cli.Command{
+func windowPathCommand() *cli.Command {
+	return &cli.Command{
 		Name:  "window_path",
 		Usage: "add and get window_path",
-		Subcommands: []cli.Command{
+		Commands: []*cli.Command{
 			{
 				Name:   "update",
 				Usage:  "update path and window_id",
-				Action: update_window_path,
+				Action: updateWindowPath,
 				Flags: []cli.Flag{
-					cli.StringFlag{
-						Name: "window_id, i",
-					},
-					cli.StringFlag{
-						Name: "path, p",
-					},
+					&cli.StringFlag{Name: "window_id", Aliases: []string{"i"}},
+					&cli.StringFlag{Name: "path", Aliases: []string{"p"}},
 				},
 			},
 			{
 				Name:   "latest",
 				Usage:  "get latest path on current window",
-				Action: latest_window_path,
+				Action: latestWindowPath,
 				Flags: []cli.Flag{
-					cli.StringFlag{
-						Name: "window_id, i",
-					},
+					&cli.StringFlag{Name: "window_id", Aliases: []string{"i"}},
 				},
 			},
 		},
 	}
-	App.Commands = append(App.Commands, command)
 }
 
-// vim:set fenc=utf-8 ff=unix sw=4 ts=4:
+func updateWindowPath(_ context.Context, cmd *cli.Command) error {
+	windowID := cmd.String("window_id")
+	if windowID == "" {
+		return errors.New("--window_id is required")
+	}
+	raw := cmd.String("path")
+	if raw == "" {
+		return errors.New("--path is required")
+	}
+	// 従来は絶対パス化も存在確認もしておらず、相対パスがそのまま保存されていた。
+	path, err := filepath.Abs(raw)
+	if err != nil {
+		return err
+	}
+	if !isDir(path) {
+		return fmt.Errorf("%s is not a directory or does not exist", path)
+	}
+
+	store, err := openStore()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+
+	return store.SaveWindowPath(windowID, path)
+}
+
+func latestWindowPath(_ context.Context, cmd *cli.Command) error {
+	windowID := cmd.String("window_id")
+	if windowID == "" {
+		return errors.New("--window_id is required")
+	}
+
+	store, err := openStore()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+
+	wp, err := store.WindowPath(windowID)
+	if err != nil {
+		return err
+	}
+	if wp == nil {
+		return cli.Exit("", 1)
+	}
+	fmt.Println(wp.Abs())
+	return nil
+}
