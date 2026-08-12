@@ -3,7 +3,6 @@ module github.com/td72/cd-utils
 go 1.26
 
 require (
-	github.com/b4b4r07/go-finder v0.0.0-20181114065839-81b460ffb72a
 	github.com/glebarez/sqlite v1.11.1-0.20260802112547-caa6e2bf4e27
 	github.com/urfave/cli v1.20.0
 	gorm.io/gorm v1.31.2
@@ -16,7 +15,6 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/pkg/errors v0.8.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	golang.org/x/sys v0.15.0 // indirect
 	golang.org/x/text v0.20.0 // indirect

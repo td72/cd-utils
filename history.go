@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/b4b4r07/go-finder"
 	"github.com/urfave/cli"
 )
 
@@ -73,22 +72,21 @@ func choice_history(_ *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	items := finder.NewItems()
-	for _, h := range hs[1:] {
-		items.Add(h.Tilde(), h)
+	// hs[0] は現在地なので候補から外す。
+	candidates := hs[1:]
+	labels := make([]string, len(candidates))
+	for i, h := range candidates {
+		labels[i] = h.Tilde()
 	}
-	fzf, err := finder.New("fzf", "--reverse", "--height", "40")
+
+	idx, err := selectWithFzf(labels)
 	if err != nil {
 		return err
 	}
-	selected, err := fzf.Select(items)
-	if err != nil {
-		return err
-	}
-	if len(selected) == 0 {
+	if idx < 0 {
 		return nil
 	}
-	fmt.Println(selected[0].(History).Abs())
+	fmt.Println(candidates[idx].Abs())
 	return nil
 }
 
