@@ -2,15 +2,15 @@ package main
 
 import (
 	"fmt"
-	"path/filepath"
-	"os"
-	"github.com/urfave/cli"
 	"github.com/b4b4r07/go-finder"
+	"github.com/urfave/cli"
+	"os"
+	"path/filepath"
 )
 
 func exist_path(path string) bool {
 	fileInfo, err := os.Stat(path)
-    return !os.IsNotExist(err) && fileInfo.IsDir()
+	return !os.IsNotExist(err) && fileInfo.IsDir()
 }
 
 func list_history(c *cli.Context) error {
@@ -107,38 +107,38 @@ func latest_history(_ *cli.Context) error {
 
 func init() {
 	command := cli.Command{
-		Name:    "history",
-		Usage:   "cd history utils",
+		Name:  "history",
+		Usage: "cd history utils",
 		Subcommands: []cli.Command{
 			{
-				Name: "list",
-				Usage: "list all cd history",
+				Name:   "list",
+				Usage:  "list all cd history",
 				Action: list_history,
 				Flags: []cli.Flag{
 					cli.BoolFlag{
-						Name: "abs, a",
+						Name:  "abs, a",
 						Usage: "print absolute path. (default uses tilda)",
 					},
 				},
 			},
 			{
-				Name: "update",
-				Usage: "remove not existed path",
+				Name:   "update",
+				Usage:  "remove not existed path",
 				Action: update_history,
 			},
 			{
-				Name: "add",
-				Usage: "add new path",
+				Name:   "add",
+				Usage:  "add new path",
 				Action: add_history,
 			},
 			{
-				Name: "choice",
-				Usage: "choice old path",
+				Name:   "choice",
+				Usage:  "choice old path",
 				Action: choice_history,
 			},
 			{
-				Name: "latest",
-				Usage: "latest path",
+				Name:   "latest",
+				Usage:  "latest path",
 				Action: latest_history,
 			},
 		},
