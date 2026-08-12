@@ -23,7 +23,7 @@ Go 自体は mise が入れるので、別途インストールしておく必�
 
 | ツール | 用途 |
 | --- | --- |
-| [git-projects](https://github.com/hosokawa-kenshi/git-projects) | `cd -` / `cd -g` / `cd -G` で git リポジトリを選ぶのに使う |
+| [git-projects](https://github.com/td72/git-projects) | `cd -` / `cd -g` / `cd -G` で git リポジトリを選ぶのに使う |
 
 `git-projects` が未インストールの場合、`cd -` / `-g` / `-G` はその旨を stderr に
 出して終了ステータス 1 で終わります（他のサブコマンドには影響しません）。
