@@ -7,40 +7,28 @@ import (
 )
 
 func update_window_path(c *cli.Context) error {
-	window_id := c.String("window_id")
-	path := c.String("path")
-
-	info := NewInfo()
-	var wp WindowPath
-	err := info.DB.Where(
-		"window_id = ?",
-		window_id,
-	).First(&wp).Error
-
+	store, err := openStore()
 	if err != nil {
-		p := NewWindowPath(window_id, path)
-		info.DB.Create(p)
-	} else {
-		new_path, is_home := convert_to_tilda_path(path)
-		wp.Path.Path = new_path
-		wp.Path.IsHome = is_home
-		// wp.Path = &Path{Path: new_path, IsHome: is_home}
-		info.DB.Save(wp)
+		return err
 	}
-	return nil
+	defer store.Close()
+
+	return store.SaveWindowPath(c.String("window_id"), c.String("path"))
 }
 
 func latest_window_path(c *cli.Context) error {
-	info := NewInfo()
-	var wp WindowPath
-	window_id := c.String("window_id")
-	err := info.DB.Where(
-		"window_id = ?",
-		window_id,
-	).First(&wp).Error
-
+	store, err := openStore()
 	if err != nil {
 		return err
+	}
+	defer store.Close()
+
+	wp, err := store.WindowPath(c.String("window_id"))
+	if err != nil {
+		return err
+	}
+	if wp == nil {
+		return fmt.Errorf("no path for window %s", c.String("window_id"))
 	}
 	fmt.Println(wp.Abs())
 	return nil

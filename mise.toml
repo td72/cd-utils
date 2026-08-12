@@ -1,6 +1,10 @@
 [tools]
 go = "latest"
 
+[env]
+# 純Go の SQLite ドライバ (glebarez/sqlite) を使うので cgo は不要。
+CGO_ENABLED = "0"
+
 [tasks.build]
 description = "Build cd-utils"
 run = "go build ./..."

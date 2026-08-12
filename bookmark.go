@@ -3,19 +3,23 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/b4b4r07/go-finder"
-	"github.com/urfave/cli"
 	"os"
 	"path/filepath"
+
+	"github.com/b4b4r07/go-finder"
+	"github.com/urfave/cli"
 )
 
 func list_bookmark(c *cli.Context) error {
-	info := NewInfo()
-	var bs []Bookmark
-	info.DB.Find(&bs)
-	err := info.DB.Order("path desc").Find(&bs).Error
+	store, err := openStore()
 	if err != nil {
-		panic(err)
+		return err
+	}
+	defer store.Close()
+
+	bs, err := store.Bookmarks()
+	if err != nil {
+		return err
 	}
 	if len(bs) == 0 {
 		fmt.Println("No Bookmark")
@@ -25,25 +29,23 @@ func list_bookmark(c *cli.Context) error {
 		if c.Bool("abs") {
 			fmt.Println(b.Abs())
 		} else {
-			fmt.Println(b.Tilda())
+			fmt.Println(b.Tilde())
 		}
 	}
 	return nil
 }
 
-func _choice_bookmark() (bookmark Bookmark, err error) {
-	info := NewInfo()
-	var bs []Bookmark
-	err = info.DB.Order("path desc").Find(&bs).Error
+func _choice_bookmark(store *Store) (bookmark Bookmark, err error) {
+	bs, err := store.Bookmarks()
 	if err != nil {
-		panic(err)
+		return bookmark, err
 	}
 	if len(bs) == 0 {
 		return bookmark, fmt.Errorf("No Bookmark")
 	}
 	items := finder.NewItems()
 	for _, b := range bs {
-		items.Add(b.Tilda(), b)
+		items.Add(b.Tilde(), b)
 	}
 	fzf, err := finder.New("fzf", "--reverse", "--height", "40")
 	if err != nil {
@@ -60,7 +62,13 @@ func _choice_bookmark() (bookmark Bookmark, err error) {
 }
 
 func choice_bookmark(_ *cli.Context) error {
-	p, err := _choice_bookmark()
+	store, err := openStore()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+
+	p, err := _choice_bookmark(store)
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -69,22 +77,23 @@ func choice_bookmark(_ *cli.Context) error {
 	return nil
 }
 
-func _delete_bookmark(b Bookmark) error {
-	info := NewInfo()
-	return info.DB.Delete(&b).Error
-}
-
 func delete_bookmark(_ *cli.Context) error {
-	b, err := _choice_bookmark()
+	store, err := openStore()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s\nregistar? [y/N]", b.Tilda())
+	defer store.Close()
+
+	b, err := _choice_bookmark(store)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%s\nregistar? [y/N]", b.Tilde())
 	stdin := bufio.NewScanner(os.Stdin)
 	for stdin.Scan() {
 		text := stdin.Text()
 		if len(text) > 0 {
-			return _delete_bookmark(b)
+			return store.DeleteBookmark(&b)
 		}
 	}
 	return nil
@@ -96,18 +105,25 @@ func add_bookmark(c *cli.Context) error {
 	}
 	path, err := filepath.Abs(c.Args().Get(0))
 	if err != nil {
-		panic(err)
+		return err
 	}
-	if !exist_path(path) {
+	if !isDir(path) {
 		return fmt.Errorf("%s is not directory or does not exist", path)
 	}
 
-	info := NewInfo()
-	b := NewBookmark(path)
-	if info.NotExist(b) {
-		info.DB.Create(b)
-	} else {
-		fmt.Printf("%s is already registered", b.Tilda())
+	store, err := openStore()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+
+	created, err := store.AddBookmark(path)
+	if err != nil {
+		return err
+	}
+	if !created {
+		p, isHome := toTildePath(path)
+		fmt.Printf("%s is already registered", Path{Path: p, IsHome: isHome}.Tilde())
 	}
 	return nil
 }

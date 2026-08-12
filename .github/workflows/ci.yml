@@ -57,5 +57,13 @@ jobs:
       - name: Test
         run: mise run test
 
-      - name: Test with race detector
-        run: mise exec -- go test -race ./...
+      # -race は cgo を要求するため、mise.toml の [env] CGO_ENABLED = "0" とは両立しない。
+      # SQLite ドライバは純Go実装 (glebarez/sqlite) なので cgo を有効にしてもビルドは通る。
+      # したがってこのステップだけ cgo を有効化して race detector を回す。
+      #
+      # 注意: step の `env:` で CGO_ENABLED を 1 にしても、mise は mise.toml の [env] を
+      # 後から適用して 0 に上書きしてしまう (mise exec / shim 経由の実行はすべてそうなる)。
+      # そのため `mise exec -- env CGO_ENABLED=1 ...` の形で、mise が env を適用した「後」に
+      # env(1) で上書きしている。
+      - name: Test with race detector (cgo enabled)
+        run: mise exec -- env CGO_ENABLED=1 go test -race ./...
